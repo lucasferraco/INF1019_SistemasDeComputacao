@@ -1,9 +1,13 @@
 LUCAS FERRAÇO DE FREITAS – 1513012 
 PEDRO GOMES BRANCO - 1113366
 
-QUESTÃO 1) Utilizando os comandos fork(), waitpid() e exit() faça um programa composto por dois processos: processo pai e processo filho.
-Pai: Imprime “Processo pai iniciado”, o seu pid e o pid de seu filho, espera o filho terminar e imprime "Processo pai finalizado".
-Filho: Imprime “Processo filho iniciado”, o seu pid, o pid do seu pai, e ao terminar imprime "Processo filho finalizado". 
+QUESTÃO 1) Faça um programa para localizar determinado valor em um vetor de inteiros desordenado.
+O programa deve ser composto por no mínimo 4 processos filhos, em um mesmo nível,
+que devem ser responsáveis por procurar o valor em uma parte do vetor cada.
+Ao encontrar o valor, o processo deve imprimir:
+Filho <PID> Encontrou na posição # do vetor. Caso o processo não encontre, deve imprimir:
+Filho <PID> Não encontrou ocorrência do valor. 
+Explique o funcionamento do seu código.
 -----------------------------------------------------
 exercicio1.c
 
@@ -12,30 +16,26 @@ exercicio1.c
 #include <unistd.h>
 #include <sys/wait.h>
 
-int main(void) {
-	int status, pidPai = getpid(), pidFilho = fork();
+int main() {
+	int i, j;
+	int n = 13, v[13] = {31,9,4,5,6,1,3,0,5,7,8,2,12}, val = 9;
 	
-	if (pidFilho != 0) { // Parent Code
-		printf("Processo pai iniciado\n");
-		
-		printf("pid: %d\n", pidPai);
-		printf("pid filho: %d\n", pidFilho);
-		
-		waitpid(-1, &status, 0);
-		printf("Processo pai finalizado\n");
-	}
-	else { // Child Code
-		printf("Processo filho iniciado\n");
-		
-		pidFilho = getpid();
-		printf("pid: %d\n", pidFilho);
-		printf("pid pai: %d\n", pidPai);
-		
-		printf("Processo filho finalizado\n");
-		exit(0);
+	for (i = 0; i < 4; i++) {
+		if (fork() == 0) {
+			
+			for (j = i; j < n; j += 4) {
+				if (v[j] == val) {
+					printf("\nFilho %d Encontrou na posicao %d do vetor.\n", getpid(), j);
+					exit(0);
+				}
+			}
+			
+			printf("\nFilho %d Nao encontrou ocorrencia do valor.\n", getpid());
+			exit(0);
+		}
 	}
 	
-    return 0;
+	return 0;
 }
 ----------------------------------------------------- 
 COMPILAÇÃO E EXECUÇÃO
@@ -45,36 +45,32 @@ $ ./exercicio1
 ----------------------------------------------------- 
 RESULTADO
 
-Processo pai iniciado
-pid: 67137
-pid filho: 67138
-Processo filho iniciado
-pid: 67138
-pid pai: 67137
-Processo filho finalizado
-Processo pai finalizado
+Filho 19420 Nao encontrou ocorrencia do valor.
+
+Filho 19421 Encontrou na posicao 1 do vetor.
+
+Filho 19422 Nao encontrou ocorrencia do valor.
+
+Filho 19423 Nao encontrou ocorrencia do valor.
 ----------------------------------------------------- 
 CONCLUSÃO
- 
-Esse programa nos mostra como é o funcionamento de divisão de processos em um computador.
-As impressões feitas via código indicam os momentos em que cada processo está em funcinamento
-através das expressões de 'iniciado' e 'finalizado'. Primeiro, o processo pai é iniciado para depois o
-processo filho ser iniciado, rodar seu bloco de código e ser finalizado, até que,
-por fim, o processo pai é finalizado.
+
+O processo pai se divide em 4 filhos de mesmo nível e cada processo 
+percorre o vetor andando de 4 em 4 casas, onde o primeiro processo filho
+começa da posição 0, o segundo filho da posição 1 e assim em diante até o
+quarto filho. Desta forma, a procura pelo valor determinado é mais rápida,
+pois cada processo não precisa esperar o outro para verificar sua parte do vetor.
 -----------------------------------------------------
 
 
 
 
-QUESTÃO 2) Ainda com um programa composto por dois processos, crie uma variável visível ao pai e ao filho iniciada com o valor zero.
-O pai deve executar um loop de 100 vezes, somar 5 a esta variável a cada iteração do loop e imprimir o texto:
-*Pai <PID> - <valor da variável>*.
-O filho deve executar um loop de 100 vezes, somar 10 a esta variável a cada iteração do loop e imprimir o texto:
-*Filho <PID> - <valor da variável>*.
-
-a) O que você observou sobre o valor da variável no pai e no filho? 
-b) O que você observou sobre a concorrência entre os processos? 
-c) Explique o por quê destes comportamentos.
+QUESTÃO 2) Faça um programa que deve realizar a soma de 2 matrizes 3 X 3.
+O programa deve ser estruturado em no mínimo 3 processos que fazem a soma de cada linha da matriz.
+Cada processo exibe, ao terminar a soma, os valores para a linha da matriz.
+Atenção para exibir as linhas na ordem correta.
+Explique o funcionamento do seu código.
+Explique como você controla a exibição de cada linha da matriz na ordem correta.
 -----------------------------------------------------
 exercicio2.c
 
@@ -83,22 +79,47 @@ exercicio2.c
 #include <unistd.h>
 #include <sys/wait.h>
 
-int main(int argc, const char * argv[]) {
-	int i, x = 0;
-
-	if (fork() != 0) { // Parent Code
-		for(i = 0; i < 100; i++) x += 5;
-
-		printf("Pai %d - %d\n", getpid(), x);
+int main() {
+	int i, j;
+	int M1[3][3], M2[3][3];
+	
+	printf("M1:\n");
+	for(i = 0; i < 3; i++) {
+		for(j = 0; j < 3; j++) {
+			M1[i][j] = 2 + i;
+			printf("%d\t", M1[i][j]);
+		}
+		printf("\n");
 	}
-	else { // Child Code
-		for(i = 0; i < 100; i++) x += 10;
-
-		printf("Filho %d - %d\n", getpid(), x);
+	printf("\n");
+	
+	printf("M2:\n");
+	for(i = 0; i < 3; i++) {
+		for(j = 0; j < 3; j++) {
+			M2[i][j] = 2 + j*i;
+			printf("%d\t", M2[i][j]);
+		}
+		printf("\n");
 	}
-
+	printf("\n");
+	
+	printf("M3:\n");
+	for (i = 0; i < 3; i++) {
+		sleep(i);
+		if (fork() == 0) {
+			printf("Linha %d:\t", i);
+			
+			for (j = 0; j < 3; j++) {
+				printf("%d\t", M1[i][j] + M2[i][j]);
+			}
+			printf("\n");
+			exit(0);
+		}
+	}
+	
 	return 0;
 }
+
 ----------------------------------------------------- 
 COMPILAÇÃO E EXECUÇÃO
 
@@ -107,30 +128,48 @@ $ ./exercicio2
 ----------------------------------------------------- 
 RESULTADO
 
-Pai 67159 - 500
-Filho 67160 - 1000
+M1:
+2	2	2	
+3	3	3	
+4	4	4	
+
+M2:
+2	2	2	
+2	3	4	
+2	4	6	
+
+M3:
+Linha 0:	4	4	4	
+Linha 1:	5	6	7	
+Linha 2:	6	8	10
 ----------------------------------------------------- 
 CONCLUSÃO
 
-a) A variável x apresentou valores distintos nos diferentes processos.
-b) Cada processo utilizou um valor próprio para a variável x, logo, cada um operou sobre uma versão de x própria.
-c) Ao executar a função fork(), o processo filho é criado com uma cópia do espaço de memória reservado para o 
-processo pai. Desta forma, cada processo tem sua área de memória para execução e, consequentemente, os valores da
-variável x são diferentes e não se alteram, pois estão em espaços de memória diferentes.
+O processo pai se divide em 3 filhos de mesmo nível e cada processo 
+soma o valor das 3 casas que pertencem à sua linha correspondente.
+Para garantir que a impressão seja na ordem corretas das linhas,
+utilizamos a função sleep, pois ainda não aprendemos como fazer 
+um processo esperar por seu irmão. Porém, como para tempo computacional
+1 segundo é muito tempo, conseguimos garantir que a impressão aparece
+na ordem correta.
 ----------------------------------------------------- 
 
 
 
 
-QUESTÃO 3) Faça um programa em que três processos executam em paralelo as seguintes ações:
-Pai: Imprime os números de 0 a 99, com um intervalo de 1 segundo entre a impressão de cada número. Após imprimir todos os números, imprime a frase “Processo pai vai finalizar” e finaliza quando o filho terminar.
-Filho: Imprime os números de 100 a 199, com um intervalo de 2 segundo entre a impressão cada número. Antes de imprimir os números, imprime a frase “Filho foi criado”. Após imprimir todos os números, imprime a frase “processo filho vai finalizar” e finaliza quando o neto terminar.
-Neto: filho do processo Filho (ou seja, neto do processo Pai). Imprime os números de 200 a 299, com um intervalo de 3 segundos entre cada número. Antes de imprimir os números, imprime a frase “Neto foi criado”. Após imprimir todos os números, imprime a frase “processo neto vai finalizar” e finaliza o processo. Importante: Em cada printf os processos devem imprimir o seu pid e o pid do seu pai.
-DICA: A chamada ao sistema sleep(1) bloqueia o processo por 1 segundo. 
+QUESTÃO 3) Faça um programa que simule a SHELL, ou seja, o programa fica aguardando comandos, ao receber um comando, o processo pai se duplica e designa a execução do comando ao filho. Quando o filho acaba de executar, o pai volta a esperar um novo comando.
 
-a)É possível observar os processos executando em paralelo?
-b)Que alterações devem ser feitas em seu programa para que primeiro sejam
-exibidas as impressões do neto, depois do filho e depois do pai?
+a) Teste para os seguintes comandos:
+	ls - Lista os arquivos/diretórios do diretório corrente
+	ps - exibe os processos que estão executando no momento 
+	pwd - exibe o diretório atual
+O seu programa deve permitir a execução de comandos com argumentos.
+b) Teste para os seguintes comandos:
+	echo "Escreva uma mensagem aqui" - exibe a mensagem entre aspas
+	cat "nome de um arquivo" - exibe o contéudo do arquivo cujo nome é passado no parâmetro
+	grep "palavra" "nome de um arquivo" - exibe as ocorrências da palavra dentro do arquivo informado
+c) Escreva um programa qualquer, compile-o e utilize o programa SHELL para executá-lo.
+Explique o funcionamento do seu código.
 -----------------------------------------------------
 exercicio3.c
 
@@ -138,725 +177,133 @@ exercicio3.c
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <string.h>
 
-int main(void) {
-	int i, status1, status2, pidPai = getpid(), pidFilho = fork();
+#define TRUE 1
 
-	if (pidFilho != 0) { // Parent Code
-		for (i = 0; i < 100; i++) {
-			printf("\npid %d - %d\n", pidPai, i);
-			sleep(1);
+int main (void) {
+	int status, i = 0;
+	char * parameters[100], * aux;
+	char entry[100];
+	
+	while (TRUE) {
+        strcpy(entry, "");
+		
+		printf("Shell> ");
+		scanf(" %[^\n]", entry);
+		
+		aux = strtok(entry, " \"");
+		while (aux != NULL) {
+            parameters[i] = aux;
+    		aux = strtok (NULL, " \"");
+    		i++;
+  		}
+        
+        parameters[i] = NULL;
+        
+		if (fork() != 0) {
+			waitpid(-1, &status, 0);
+			i = 0;
 		}
-		printf("\nProcesso pai vai finalizar\n");
-
-		waitpid(-1, &status1, 0);
-		printf("\nProcesso pai finalizado\n");
-	}
-	else if (fork() != 0) { // Child Code
-		printf("\nFilho foi criado\n");
-
-		for (i = 100; i < 200; i++) {
-			printf("\npid %d, pid pai %d - %d\n", getpid(), getppid(), i);
-			sleep(2);
+		else {
+			execvp(parameters[0], parameters);
 		}
-		printf("\nProcesso filho vai finalizar\n");
-
-		waitpid(-1, &status2, 0);
-		printf("\nProcesso filho finalizado\n");
-		exit(1);
+		
+		printf("\n");
 	}
-	else { // Grandchild Code
-		printf("\nNeto foi criado - %d\n", getpid());
-
-		for (i = 200; i < 300; i++) {
-			printf("\npid %d, pid pai %d - %d\n", getpid(), getppid(), i);
-			sleep(3);
-		}
-		printf("\nProcesso neto vai finalizar\n");
-		printf("\nProcesso neto finalizado\n");
-		exit(1);
-	}
-
-    return 0;
+	
+	return 0;
 }
+
+
+-----------------------------------------------------
+teste.c
+
+#include <stdio.h>
+
+int main() {
+	printf("Hello Shell!!!");
+
+	return 0;
+}
+
 ----------------------------------------------------- 
 COMPILAÇÃO E EXECUÇÃO
 
 $ gcc -o exercicio3 exercicio3.c
 $ ./exercicio3
+$ gcc -o teste teste.c
 ----------------------------------------------------- 
 RESULTADO
 
-pid 67304 - 0
-
-Filho foi criado
-
-pid 67305, pid pai 67304 - 100
-
-Neto foi criado - 67306
-
-pid 67306, pid pai 67305 - 200
-
-pid 67304 - 1
-
-pid 67305, pid pai 67304 - 101
-
-pid 67304 - 2
-
-pid 67306, pid pai 67305 - 201
-
-pid 67304 - 3
-
-pid 67305, pid pai 67304 - 102
-
-pid 67304 - 4
-
-pid 67304 - 5
-
-pid 67306, pid pai 67305 - 202
-
-pid 67305, pid pai 67304 - 103
-
-pid 67304 - 6
-
-pid 67304 - 7
-
-pid 67305, pid pai 67304 - 104
-
-pid 67304 - 8
-
-pid 67306, pid pai 67305 - 203
-
-pid 67304 - 9
-
-pid 67305, pid pai 67304 - 105
-
-pid 67304 - 10
-
-pid 67304 - 11
-
-pid 67306, pid pai 67305 - 204
-
-pid 67305, pid pai 67304 - 106
-
-pid 67304 - 12
-
-pid 67304 - 13
-
-pid 67305, pid pai 67304 - 107
-
-pid 67304 - 14
-
-pid 67306, pid pai 67305 - 205
-
-pid 67304 - 15
-
-pid 67305, pid pai 67304 - 108
-
-pid 67304 - 16
-
-pid 67304 - 17
-
-pid 67306, pid pai 67305 - 206
-
-pid 67305, pid pai 67304 - 109
-
-pid 67304 - 18
-
-pid 67304 - 19
-
-pid 67305, pid pai 67304 - 110
-
-pid 67304 - 20
-
-pid 67306, pid pai 67305 - 207
-
-pid 67304 - 21
-
-pid 67305, pid pai 67304 - 111
-
-pid 67304 - 22
-
-pid 67304 - 23
-
-pid 67306, pid pai 67305 - 208
-
-pid 67305, pid pai 67304 - 112
-
-pid 67304 - 24
-
-pid 67304 - 25
-
-pid 67305, pid pai 67304 - 113
-
-pid 67304 - 26
-
-pid 67306, pid pai 67305 - 209
-
-pid 67304 - 27
-
-pid 67305, pid pai 67304 - 114
-
-pid 67304 - 28
-
-pid 67304 - 29
-
-pid 67306, pid pai 67305 - 210
-
-pid 67305, pid pai 67304 - 115
-
-pid 67304 - 30
-
-pid 67304 - 31
-
-pid 67305, pid pai 67304 - 116
-
-pid 67304 - 32
-
-pid 67306, pid pai 67305 - 211
-
-pid 67304 - 33
-
-pid 67305, pid pai 67304 - 117
-
-pid 67304 - 34
-
-pid 67304 - 35
-
-pid 67306, pid pai 67305 - 212
-
-pid 67305, pid pai 67304 - 118
-
-pid 67304 - 36
-
-pid 67304 - 37
-
-pid 67305, pid pai 67304 - 119
-
-pid 67304 - 38
-
-pid 67306, pid pai 67305 - 213
-
-pid 67304 - 39
-
-pid 67305, pid pai 67304 - 120
-
-pid 67304 - 40
-
-pid 67304 - 41
-
-pid 67306, pid pai 67305 - 214
-
-pid 67305, pid pai 67304 - 121
-
-pid 67304 - 42
-
-pid 67304 - 43
-
-pid 67305, pid pai 67304 - 122
-
-pid 67304 - 44
-
-pid 67306, pid pai 67305 - 215
-
-pid 67304 - 45
-
-pid 67305, pid pai 67304 - 123
-
-pid 67304 - 46
-
-pid 67304 - 47
-
-pid 67306, pid pai 67305 - 216
-
-pid 67305, pid pai 67304 - 124
-
-pid 67304 - 48
-
-pid 67304 - 49
-
-pid 67305, pid pai 67304 - 125
-
-pid 67304 - 50
-
-pid 67306, pid pai 67305 - 217
-
-pid 67304 - 51
-
-pid 67305, pid pai 67304 - 126
-
-pid 67304 - 52
-
-pid 67304 - 53
-
-pid 67306, pid pai 67305 - 218
-
-pid 67305, pid pai 67304 - 127
-
-pid 67304 - 54
-
-pid 67304 - 55
-
-pid 67305, pid pai 67304 - 128
-
-pid 67304 - 56
-
-pid 67306, pid pai 67305 - 219
-
-pid 67304 - 57
-
-pid 67305, pid pai 67304 - 129
-
-pid 67304 - 58
-
-pid 67304 - 59
-
-pid 67306, pid pai 67305 - 220
-
-pid 67305, pid pai 67304 - 130
-
-pid 67304 - 60
-
-pid 67304 - 61
-
-pid 67305, pid pai 67304 - 131
-
-pid 67304 - 62
-
-pid 67306, pid pai 67305 - 221
-
-pid 67304 - 63
-
-pid 67305, pid pai 67304 - 132
-
-pid 67304 - 64
-
-pid 67304 - 65
-
-pid 67306, pid pai 67305 - 222
-
-pid 67305, pid pai 67304 - 133
-
-pid 67304 - 66
-
-pid 67304 - 67
-
-pid 67305, pid pai 67304 - 134
-
-pid 67304 - 68
-
-pid 67306, pid pai 67305 - 223
-
-pid 67304 - 69
-
-pid 67305, pid pai 67304 - 135
-
-pid 67304 - 70
-
-pid 67304 - 71
-
-pid 67306, pid pai 67305 - 224
-
-pid 67305, pid pai 67304 - 136
-
-pid 67304 - 72
-
-pid 67304 - 73
-
-pid 67305, pid pai 67304 - 137
-
-pid 67304 - 74
-
-pid 67306, pid pai 67305 - 225
-
-pid 67304 - 75
-
-pid 67305, pid pai 67304 - 138
-
-pid 67304 - 76
-
-pid 67304 - 77
-
-pid 67306, pid pai 67305 - 226
-
-pid 67305, pid pai 67304 - 139
-
-pid 67304 - 78
-
-pid 67304 - 79
-
-pid 67305, pid pai 67304 - 140
-
-pid 67304 - 80
-
-pid 67306, pid pai 67305 - 227
-
-pid 67304 - 81
-
-pid 67305, pid pai 67304 - 141
-
-pid 67304 - 82
-
-pid 67304 - 83
-
-pid 67306, pid pai 67305 - 228
-
-pid 67305, pid pai 67304 - 142
-
-pid 67304 - 84
-
-pid 67304 - 85
-
-pid 67305, pid pai 67304 - 143
-
-pid 67304 - 86
-
-pid 67306, pid pai 67305 - 229
-
-pid 67304 - 87
-
-pid 67305, pid pai 67304 - 144
-
-pid 67304 - 88
-
-pid 67304 - 89
-
-pid 67306, pid pai 67305 - 230
-
-pid 67305, pid pai 67304 - 145
-
-pid 67304 - 90
-
-pid 67304 - 91
-
-pid 67305, pid pai 67304 - 146
-
-pid 67304 - 92
-
-pid 67306, pid pai 67305 - 231
-
-pid 67304 - 93
-
-pid 67305, pid pai 67304 - 147
-
-pid 67304 - 94
-
-pid 67304 - 95
-
-pid 67306, pid pai 67305 - 232
-
-pid 67305, pid pai 67304 - 148
-
-pid 67304 - 96
-
-pid 67304 - 97
-
-pid 67305, pid pai 67304 - 149
-
-pid 67304 - 98
-
-pid 67306, pid pai 67305 - 233
-
-pid 67304 - 99
-
-pid 67305, pid pai 67304 - 150
-
-Processo pai vai finalizar
-
-pid 67306, pid pai 67305 - 234
-
-pid 67305, pid pai 67304 - 151
-
-pid 67305, pid pai 67304 - 152
-
-pid 67306, pid pai 67305 - 235
-
-pid 67305, pid pai 67304 - 153
-
-pid 67306, pid pai 67305 - 236
-
-pid 67305, pid pai 67304 - 154
-
-pid 67305, pid pai 67304 - 155
-
-pid 67306, pid pai 67305 - 237
-
-pid 67305, pid pai 67304 - 156
-
-pid 67306, pid pai 67305 - 238
-
-pid 67305, pid pai 67304 - 157
-
-pid 67305, pid pai 67304 - 158
-
-pid 67306, pid pai 67305 - 239
-
-pid 67305, pid pai 67304 - 159
-
-pid 67306, pid pai 67305 - 240
-
-pid 67305, pid pai 67304 - 160
-
-pid 67305, pid pai 67304 - 161
-
-pid 67306, pid pai 67305 - 241
-
-pid 67305, pid pai 67304 - 162
-
-pid 67306, pid pai 67305 - 242
-
-pid 67305, pid pai 67304 - 163
-
-pid 67305, pid pai 67304 - 164
-
-pid 67306, pid pai 67305 - 243
-
-pid 67305, pid pai 67304 - 165
-
-pid 67306, pid pai 67305 - 244
-
-pid 67305, pid pai 67304 - 166
-
-pid 67305, pid pai 67304 - 167
-
-pid 67306, pid pai 67305 - 245
-
-pid 67305, pid pai 67304 - 168
-
-pid 67306, pid pai 67305 - 246
-
-pid 67305, pid pai 67304 - 169
-
-pid 67305, pid pai 67304 - 170
-
-pid 67306, pid pai 67305 - 247
-
-pid 67305, pid pai 67304 - 171
-
-pid 67306, pid pai 67305 - 248
-
-pid 67305, pid pai 67304 - 172
-
-pid 67305, pid pai 67304 - 173
-
-pid 67306, pid pai 67305 - 249
-
-pid 67305, pid pai 67304 - 174
-
-pid 67306, pid pai 67305 - 250
-
-pid 67305, pid pai 67304 - 175
-
-pid 67305, pid pai 67304 - 176
-
-pid 67306, pid pai 67305 - 251
-
-pid 67305, pid pai 67304 - 177
-
-pid 67306, pid pai 67305 - 252
-
-pid 67305, pid pai 67304 - 178
-
-pid 67305, pid pai 67304 - 179
-
-pid 67306, pid pai 67305 - 253
-
-pid 67305, pid pai 67304 - 180
-
-pid 67306, pid pai 67305 - 254
-
-pid 67305, pid pai 67304 - 181
-
-pid 67305, pid pai 67304 - 182
-
-pid 67306, pid pai 67305 - 255
-
-pid 67305, pid pai 67304 - 183
-
-pid 67306, pid pai 67305 - 256
-
-pid 67305, pid pai 67304 - 184
-
-pid 67305, pid pai 67304 - 185
-
-pid 67306, pid pai 67305 - 257
-
-pid 67305, pid pai 67304 - 186
-
-pid 67306, pid pai 67305 - 258
-
-pid 67305, pid pai 67304 - 187
-
-pid 67305, pid pai 67304 - 188
-
-pid 67306, pid pai 67305 - 259
-
-pid 67305, pid pai 67304 - 189
-
-pid 67306, pid pai 67305 - 260
-
-pid 67305, pid pai 67304 - 190
-
-pid 67305, pid pai 67304 - 191
-
-pid 67306, pid pai 67305 - 261
-
-pid 67305, pid pai 67304 - 192
-
-pid 67306, pid pai 67305 - 262
-
-pid 67305, pid pai 67304 - 193
-
-pid 67305, pid pai 67304 - 194
-
-pid 67306, pid pai 67305 - 263
-
-pid 67305, pid pai 67304 - 195
-
-pid 67306, pid pai 67305 - 264
-
-pid 67305, pid pai 67304 - 196
-
-pid 67305, pid pai 67304 - 197
-
-pid 67306, pid pai 67305 - 265
-
-pid 67305, pid pai 67304 - 198
-
-pid 67306, pid pai 67305 - 266
-
-pid 67305, pid pai 67304 - 199
-
-Processo filho vai finalizar
-
-pid 67306, pid pai 67305 - 267
-
-pid 67306, pid pai 67305 - 268
-
-pid 67306, pid pai 67305 - 269
-
-pid 67306, pid pai 67305 - 270
-
-pid 67306, pid pai 67305 - 271
-
-pid 67306, pid pai 67305 - 272
-
-pid 67306, pid pai 67305 - 273
-
-pid 67306, pid pai 67305 - 274
-
-pid 67306, pid pai 67305 - 275
-
-pid 67306, pid pai 67305 - 276
-
-pid 67306, pid pai 67305 - 277
-
-pid 67306, pid pai 67305 - 278
-
-pid 67306, pid pai 67305 - 279
-
-pid 67306, pid pai 67305 - 280
-
-pid 67306, pid pai 67305 - 281
-
-pid 67306, pid pai 67305 - 282
-
-pid 67306, pid pai 67305 - 283
-
-pid 67306, pid pai 67305 - 284
-
-pid 67306, pid pai 67305 - 285
-
-pid 67306, pid pai 67305 - 286
-
-pid 67306, pid pai 67305 - 287
-
-pid 67306, pid pai 67305 - 288
-
-pid 67306, pid pai 67305 - 289
-
-pid 67306, pid pai 67305 - 290
-
-pid 67306, pid pai 67305 - 291
-
-pid 67306, pid pai 67305 - 292
-
-pid 67306, pid pai 67305 - 293
-
-pid 67306, pid pai 67305 - 294
-
-pid 67306, pid pai 67305 - 295
-
-pid 67306, pid pai 67305 - 296
-
-pid 67306, pid pai 67305 - 297
-
-pid 67306, pid pai 67305 - 298
-
-pid 67306, pid pai 67305 - 299
-
-Processo neto vai finalizar
-
-Processo neto finalizado
-
-Processo filho finalizado
-
-Processo pai finalizado
------------------------------------------------------ 
-CONCLUSÃO
-
-a) Sim, todos os processos vão imprimindo seus respectivos números em paralelo.
-b) Devemos chamar a função waitpid antes do bloco de for dos processos pai e filho,
-para que os mesmos aguardem os seus processos filhos ('filho' e 'neto', respectivamente)
-terminarem de executar para começarem a exibir suas impressões. Desta forma, quando o processo
-neto se encerrar, as impressões do filho serão exibidas e, quando o filho se encerrar, 
-as impressões do pai serão exibidas.
------------------------------------------------------ 
-
-
-
-
-QUESTÃO 4) Crie um programa que realize a impressão da frase: "Alo mundo", no arquivo “alomundo.c”. Compile este programa. Em seguida, crie um programa que execute o programa alomundo criado por você. Utilize alguma função da família "execv" para realizar esta atividade.
-DICA: Para saber os protótipos das funções disponíveis execute o comando “man” no Terminal (para acessar o manual: "man execv").
------------------------------------------------------
-exercicio4.c
-
-int main(void) {
-	int status;
-
-	if (fork() != 0) { // Parent Code
-		waitpid(-1, &status, 0);
-	}
-	else { // Child Code
-		execv("alomundo", NULL);
-		exit(1);
-	}
-
-    return 0;
-}
------------------------------------------------------
-alomundo.c
+Shell> ls
+ex3		exercicio1.c	exercicio2.c	exercicio3.c	lab2.txt
+
+Shell> ps
+  PID TTY           TIME CMD
+  362 ttys000    0:00.03 /Applications/iTerm.app/Contents/MacOS/iTerm2 --server
+  365 ttys000    0:05.73 -zsh
+14543 ttys000    0:00.00 ./ex3
+
+Shell> pwd
+/Users/pedrogomesbranco/Documents/GitHub/INF1019_SistemasDeComputacao/LAB2_Fork&Exec_Part2
+
+Shell> echo "Mensagem de teste"
+Mensagem de teste
+
+Shell> cat "exercicio1.c"
+//
+//  exercicio1.c
+//  INF1019
+//
+//  Created by Lucas Ferraço on 31/08/17.
+//  Copyright © 2017 Lucas Ferraço. All rights reserved.
+//
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
-int main(void) {
-	printf("Alo mundo!\n");
+int main() {
+	int i, j;
+	int n = 13, v[13] = {31,9,4,5,6,1,3,0,5,7,8,2,12}, val = 9;
 
-    return 0;
+	for (i = 0; i < 4; i++) {
+		if (fork() == 0) {
+
+			for (j = i; j < n; j += 4) {
+				if (v[j] == val) {
+					printf("\nFilho %d Encontrou na posicao %d do vetor.\n", getpid(), j);
+					exit(0);
+				}
+			}
+
+			printf("\nFilho %d Nao encontrou ocorrencia do valor.\n", getpid());
+			exit(0);
+		}
+	}
+
+	return 0;
 }
------------------------------------------------------ 
-COMPILAÇÃO E EXECUÇÃO
 
-$ gcc -o alomundo alomundo.c
-$ gcc -o exercicio4 exercicio4.c
-$ ./exercicio4
------------------------------------------------------ 
-RESULTADO
+Shell> grep "int" "exercicio1.c"
+int main() {
+	int i, j;
+	int n = 13, v[13] = {31,9,4,5,6,1,3,0,5,7,8,2,12}, val = 9;
+					printf("\nFilho %d Encontrou na posicao %d do vetor.\n", getpid(), j);
+			printf("\nFilho %d Nao encontrou ocorrencia do valor.\n", getpid());
 
-Alo mundo!
+Shell> ./teste
+Hello Shell!!!
+Shell>
+
 ----------------------------------------------------- 
 CONCLUSÃO
 
-Percebemos que quando o comando execv é chamado, o processo é substituído pelo novo programa,
-indicado pelo parâmetro. Dessa forma, o processo que estava rodando (o que chamou a função)
-não volta a ser executado.
+O processo pai lê o input do usuário como um comando de SHELL e prepara os argumentos para
+que o processo filho utilize-os corretamente na chamada da função execvp.
+Usamos a função strtok para interpretar o input do usuário e separá-lo por espaços em branco para passar corretamente os parâmetros para a função execvp.
+Já a função execvp, nós utilizamos, pois ela acha o caminho correto para a instrução
+passada como parâmetro.
+----------------------------------------------------- 
