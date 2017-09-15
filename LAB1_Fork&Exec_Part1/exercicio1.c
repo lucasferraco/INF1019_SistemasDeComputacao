@@ -1,11 +1,3 @@
-//
-//  exercicio1.c
-//  
-//
-//  Created by Lucas Ferraço on 24/08/17.
-//
-//
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

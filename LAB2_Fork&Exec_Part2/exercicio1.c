@@ -1,11 +1,3 @@
-//
-//  exercicio1.c
-//  INF1019
-//
-//  Created by Lucas Ferraço on 31/08/17.
-//  Copyright © 2017 Lucas Ferraço. All rights reserved.
-//
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
