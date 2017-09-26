@@ -1,0 +1,338 @@
+LUCAS FERRAÇO DE FREITAS – 1513012
+PEDRO GOMES BRANCO - 1113366
+
+QUESTÃO 1) Usando processos, escreva um programa C que implemente o problema do
+produtor/consumidor.
+O produtor e o consumidor devem ser filhos de um processo pai.
+O produtor deve produzir dados (números inteiros pseudo-aleatórios) a cada 1 segundo
+colocando-os em uma fila (buffer, implementação circular).
+O consumidor deve retirar dados da fila a cada 2 segundos.
+O tamanho máximo da fila deve ser de 8 elementos (MAXFILA) e tanto o produtor como o
+consumidor devem produzir/consumir 64 elementos (números inteiros de 1 a 64, por
+exemplo).
+Usar as funções pause() para o processo dormir e kill (pid, SIGCONT) para acordar o outro
+processo.
+-----------------------------------------------------
+ex1.c
+
+#include <stdio.h>
+#include <sys/shm.h>
+#include <signal.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <stdlib.h>
+
+#define MAXFILA 8
+#define MAXITENS 64
+
+/// Fila Circular - interface
+typedef struct filaCircular {
+	int fila[MAXFILA];
+	int ini;
+	int fim;
+	int tam;
+} FilaCircular;
+void inicializa(FilaCircular * f);
+void insereNa(FilaCircular * f, int valor);
+int removeNa(FilaCircular * f);
+int estaCheia(FilaCircular * f);
+int estaVazia(FilaCircular * f);
+
+void produz(FilaCircular * fila, int pidProd, int pidCons);
+void consome(FilaCircular * fila, int pidCons, int pidProd);
+
+int main (void) {
+	int segmento1, segmento2, status;
+	int pidProd, pidCons, * pidConsCompartilhado;
+	FilaCircular * fila;
+
+	// Aloca a memória compartilhada
+	segmento1 = shmget (IPC_PRIVATE, sizeof(FilaCircular), IPC_CREAT | IPC_EXCL | S_IRUSR |  S_IWUSR);
+	segmento2 = shmget (IPC_PRIVATE, sizeof(int), IPC_CREAT | IPC_EXCL | S_IRUSR |  S_IWUSR);
+
+	// Associa a memória compartilhada ao processo
+	fila = (FilaCircular *) shmat (segmento1, 0, 0);
+	pidConsCompartilhado = (int *) shmat (segmento2, 0, 0);
+
+	inicializa(fila);
+	*pidConsCompartilhado = 0;
+
+	pidProd = fork();
+
+	if (pidProd != 0) { // Processo pai
+		pidCons = fork();
+
+		if (pidCons != 0) { // Processo pai
+			*pidConsCompartilhado = pidCons;
+			shmdt(pidConsCompartilhado);
+
+			waitpid (-1, &status, 0);
+			waitpid (-1, &status, 0);
+
+			printf("Programa finalizado\n");
+
+			shmdt(fila);
+			shmctl(segmento1, IPC_RMID, 0);
+		}
+		else { // Processo consumidor
+			printf("C -> processo inicializado\n");
+
+			shmdt(pidConsCompartilhado);
+			pidCons = getpid();
+
+			consome(fila, pidCons, pidProd);
+
+			shmdt(fila);
+			exit(1);
+		}
+	}
+	else { // Processo produtor
+		while (*pidConsCompartilhado == 0);
+		printf("P -> processo inicializado\n");
+
+		pidCons = *pidConsCompartilhado;
+		shmctl(segmento2, IPC_RMID, 0);
+		pidProd = getpid();
+
+		produz(fila, pidProd, pidCons);
+
+		shmdt(fila);
+		exit(1);
+	}
+
+	return 0;
+}
+
+void produz(FilaCircular * fila, int pidProd, int pidCons) {
+	int i, item;
+
+	for (i = 0; i < MAXITENS; i++) {
+		// Gero item diferente de 0
+		item = rand()%100 + 1;
+
+		// Recebo sinal de lotada
+		if (estaCheia(fila))
+			kill(pidProd, SIGSTOP);
+
+		// Insiro item
+		insereNa(fila, item);
+		printf("P -> %d-esimo item produzido, valor %d\n", i + 1, item);
+
+		// Mando sinal de nao vazia
+		if (fila->tam == 1)
+			kill(pidCons, SIGCONT);
+
+		sleep(1);
+	}
+}
+
+void consome(FilaCircular * fila, int pidCons, int pidProd) {
+	int i, item;
+
+	for (i = 0; i < MAXITENS; i++) {
+		// Recebo sinal de vazia
+		if (estaVazia(fila))
+			kill (pidCons, SIGSTOP);
+
+		// Consumo item
+		item = removeNa(fila);
+
+		// Mando sinal de nao lotada
+		if (fila->tam == MAXFILA - 1)
+			kill(pidProd, SIGCONT);
+
+		printf("C -> %d-esimo item consumido, valor %d\n", i + 1, item);
+		sleep(2);
+	}
+}
+
+/// Fila Circular - implementacao
+void inicializa(FilaCircular * f) {
+	int i;
+
+	for (i = 0; i < MAXFILA; i++) {
+		f->fila[i] = 0;
+	}
+
+	f->ini = 0;
+	f->fim = 0;
+	f->tam = 0;
+}
+
+void insereNa(FilaCircular * f, int valor) {
+	f->fila[f->fim] = valor;
+	f->fim = (f->fim + 1) % MAXFILA;
+	(f->tam)++;
+}
+
+int removeNa(FilaCircular * f) {
+	int valor;
+	valor = f->fila[f->ini];
+
+	f->fila[f->ini] = 0;
+	f->ini = (f->ini + 1) % MAXFILA;
+	(f->tam)--;
+
+	return valor;
+}
+
+int estaCheia(FilaCircular * f) {
+	return f->tam == MAXFILA;
+}
+
+int estaVazia(FilaCircular * f) {
+	return f->tam == 0;
+}
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex1 ex1.c
+$ ./ex1
+-----------------------------------------------------
+RESULTADO
+
+P -> processo inicializado
+P -> 1-esimo item produzido, valor 8
+C -> processo inicializado
+C -> 1-esimo item consumido, valor 8
+P -> 2-esimo item produzido, valor 50
+C -> 2-esimo item consumido, valor 50
+P -> 3-esimo item produzido, valor 74
+P -> 4-esimo item produzido, valor 59
+C -> 3-esimo item consumido, valor 74
+P -> 5-esimo item produzido, valor 31
+P -> 6-esimo item produzido, valor 73
+C -> 4-esimo item consumido, valor 59
+P -> 7-esimo item produzido, valor 45
+P -> 8-esimo item produzido, valor 79
+C -> 5-esimo item consumido, valor 31
+P -> 9-esimo item produzido, valor 24
+P -> 10-esimo item produzido, valor 10
+C -> 6-esimo item consumido, valor 73
+P -> 11-esimo item produzido, valor 41
+P -> 12-esimo item produzido, valor 66
+C -> 7-esimo item consumido, valor 45
+P -> 13-esimo item produzido, valor 93
+P -> 14-esimo item produzido, valor 43
+C -> 8-esimo item consumido, valor 79
+P -> 15-esimo item produzido, valor 88
+P -> 16-esimo item produzido, valor 4
+C -> 9-esimo item consumido, valor 24
+P -> 17-esimo item produzido, valor 28
+C -> 10-esimo item consumido, valor 10
+P -> 18-esimo item produzido, valor 30
+C -> 11-esimo item consumido, valor 41
+P -> 19-esimo item produzido, valor 41
+C -> 12-esimo item consumido, valor 66
+P -> 20-esimo item produzido, valor 13
+P -> 21-esimo item produzido, valor 4
+C -> 13-esimo item consumido, valor 93
+C -> 14-esimo item consumido, valor 43
+P -> 22-esimo item produzido, valor 70
+C -> 15-esimo item consumido, valor 88
+P -> 23-esimo item produzido, valor 10
+C -> 16-esimo item consumido, valor 4
+P -> 24-esimo item produzido, valor 58
+C -> 17-esimo item consumido, valor 28
+P -> 25-esimo item produzido, valor 61
+C -> 18-esimo item consumido, valor 30
+P -> 26-esimo item produzido, valor 34
+C -> 19-esimo item consumido, valor 41
+P -> 27-esimo item produzido, valor 100
+C -> 20-esimo item consumido, valor 13
+P -> 28-esimo item produzido, valor 79
+C -> 21-esimo item consumido, valor 4
+P -> 29-esimo item produzido, valor 17
+C -> 22-esimo item consumido, valor 70
+P -> 30-esimo item produzido, valor 36
+C -> 23-esimo item consumido, valor 10
+P -> 31-esimo item produzido, valor 98
+C -> 24-esimo item consumido, valor 58
+P -> 32-esimo item produzido, valor 27
+C -> 25-esimo item consumido, valor 61
+P -> 33-esimo item produzido, valor 13
+P -> 34-esimo item produzido, valor 68
+C -> 26-esimo item consumido, valor 34
+C -> 27-esimo item consumido, valor 100
+P -> 35-esimo item produzido, valor 11
+C -> 28-esimo item consumido, valor 79
+P -> 36-esimo item produzido, valor 34
+C -> 29-esimo item consumido, valor 17
+P -> 37-esimo item produzido, valor 80
+P -> 38-esimo item produzido, valor 50
+C -> 30-esimo item consumido, valor 36
+C -> 31-esimo item consumido, valor 98
+P -> 39-esimo item produzido, valor 80
+C -> 32-esimo item consumido, valor 27
+P -> 40-esimo item produzido, valor 22
+C -> 33-esimo item consumido, valor 13
+P -> 41-esimo item produzido, valor 68
+P -> 42-esimo item produzido, valor 73
+C -> 34-esimo item consumido, valor 68
+P -> 43-esimo item produzido, valor 94
+C -> 35-esimo item consumido, valor 11
+P -> 44-esimo item produzido, valor 37
+C -> 36-esimo item consumido, valor 34
+C -> 37-esimo item consumido, valor 80
+P -> 45-esimo item produzido, valor 86
+C -> 38-esimo item consumido, valor 50
+P -> 46-esimo item produzido, valor 46
+C -> 39-esimo item consumido, valor 80
+P -> 47-esimo item produzido, valor 29
+P -> 48-esimo item produzido, valor 92
+C -> 40-esimo item consumido, valor 22
+C -> 41-esimo item consumido, valor 68
+P -> 49-esimo item produzido, valor 95
+P -> 50-esimo item produzido, valor 58
+C -> 42-esimo item consumido, valor 73
+P -> 51-esimo item produzido, valor 2
+C -> 43-esimo item consumido, valor 94
+C -> 44-esimo item consumido, valor 37
+P -> 52-esimo item produzido, valor 54
+C -> 45-esimo item consumido, valor 86
+P -> 53-esimo item produzido, valor 9
+C -> 46-esimo item consumido, valor 46
+P -> 54-esimo item produzido, valor 45
+C -> 47-esimo item consumido, valor 29
+P -> 55-esimo item produzido, valor 69
+C -> 48-esimo item consumido, valor 92
+P -> 56-esimo item produzido, valor 91
+C -> 49-esimo item consumido, valor 95
+P -> 57-esimo item produzido, valor 25
+C -> 50-esimo item consumido, valor 58
+P -> 58-esimo item produzido, valor 97
+C -> 51-esimo item consumido, valor 2
+P -> 59-esimo item produzido, valor 31
+C -> 52-esimo item consumido, valor 54
+P -> 60-esimo item produzido, valor 4
+C -> 53-esimo item consumido, valor 9
+P -> 61-esimo item produzido, valor 23
+P -> 62-esimo item produzido, valor 67
+C -> 54-esimo item consumido, valor 45
+P -> 63-esimo item produzido, valor 50
+C -> 55-esimo item consumido, valor 69
+C -> 56-esimo item consumido, valor 91
+P -> 64-esimo item produzido, valor 25
+C -> 57-esimo item consumido, valor 25
+C -> 58-esimo item consumido, valor 97
+C -> 59-esimo item consumido, valor 31
+C -> 60-esimo item consumido, valor 4
+C -> 61-esimo item consumido, valor 23
+C -> 62-esimo item consumido, valor 67
+C -> 63-esimo item consumido, valor 50
+C -> 64-esimo item consumido, valor 25
+Programa finalizado
+-----------------------------------------------------
+CONCLUSÃO
+
+Quando utilizamos o comando kill, somos capazes de controlar a comunicação entre
+diferentes processos e isso nos permite manter os dados e o funcionamento do
+programa seguros e rodando de acordo com o que queremos.
+Para o problema do produtor/consumidor, isso é essencial para que o produtor produza
+somente no número máximo estipulado de memória e para que o consumidor só consuma
+itens armazenados nesse mesmo espaço de memória. Desta forma, usamos o conceito de
+memória compartilhada e o de sinais (através do kill), duas formas de comunicacao
+entre processos, para manter os processos rodando de acordo com o que foi pedido.
+-----------------------------------------------------
