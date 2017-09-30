@@ -1,0 +1,434 @@
+LUCAS FERRAÇO DE FREITAS – 1513012
+PEDRO GOMES BRANCO - 1113366
+
+QUESTÃO 1) Faça um programa que crie 2 processos filho e alterne a execução dos filhos.
+Após 10 trocas de contexto, o processo pai mata os processos filho.
+OBS: Os processos filho são formados por loops eternos.
+-----------------------------------------------------
+ex1.c
+
+#include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+#define TRUE 1
+
+int main() {
+  int i;
+	pid_t pid1, pid2, pid_aux;
+
+	if((pid1 = fork()) < 0) { // Processo pai
+		fprintf(stderr, "Erro ao criar filho\n");
+		exit(-1);
+	}
+	else if(pid1 == 0) { // Processo filho 1
+		printf("Processo filho 1 inicializado.\n");
+
+		while(TRUE)
+			printf("PF1 - ");
+
+    printf("\n");
+	}
+	else {
+		if((pid2 = fork()) < 0) { // Processo pai
+			fprintf(stderr, "Erro ao criar filho\n");
+			exit(-1);
+		}
+
+		if(pid2 == 0) { // Processo filho 2
+			printf("Processo filho 2 inicializado.\n");
+
+			while(TRUE)
+				printf("PF2 - ");
+
+      printf("\n");
+		}
+		else {
+			kill(pid1, SIGSTOP);
+			kill(pid2, SIGSTOP);
+
+			for(i = 0; i < 10; i++) {
+				if(i != 0) {
+          printf("\n\n--------- Processo pai alterna os filhos ---------\n\n");
+          kill(pid1, SIGSTOP);
+        }
+
+				sleep(1);
+				kill(pid2, SIGCONT);
+				sleep(1);
+
+				pid_aux = pid1;
+				pid1 = pid2;
+				pid2 = pid_aux;
+			}
+
+			kill(pid1, SIGKILL);
+			kill(pid2, SIGKILL);
+
+			exit(1);
+			}
+		}
+
+	return 0;
+}
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex1 ex1.c
+$ ./ex1
+-----------------------------------------------------
+RESULTADO
+
+A impressão é muito grande para por aqui.
+O resultado são várias impressões de "PF1" e "PF2" alternadas a cada iteração do loop
+presente no Processo pai. Além de uma impressão "--------- Processo pai alterna os filhos ---------"
+entre cada alternância.
+-----------------------------------------------------
+CONCLUSÃO
+
+A cada iteração do loop presente no processo pai, troca-se os pids e, consequentemente,
+a execução dos dois processos filhos criados. Dessa forma, fica claro que é possível controlar
+a execução dos processos filhos a partir do pai através de sinais que o pai envia.
+-----------------------------------------------------
+
+
+
+
+QUESTÃO 2) Faça um programa que leia 2 números inteiros e imprima o resultado das 4 operações básicas sobre estes 2 números.
+Verifique o que acontece se o 2o. número da entrada for 0 (zero).
+Capture o sinal de erro de floating point (SIGFPE) e repita a experiência anterior.
+Altere seu programa para ler e realizar as operações aritméticas com números reais.
+-----------------------------------------------------
+ex2.c
+
+#include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+void errorHandler(int signal);
+
+int main() {
+	int int1, int2;
+	int somInt, subInt, multInt, divisInt;
+	float num1, num2;
+	float soma, sub, mult, divis;
+
+	signal(SIGFPE, errorHandler);
+
+	printf("Entre dois numeros:\n");
+	scanf("%f %f", &num1, &num2);
+
+  printf("\nOperacoes com real\n");
+  soma = num1 + num2;
+	sub = num1 - num2;
+	mult = num1 * num2;
+	divis = num1 / num2;
+
+	printf("soma:          %f \n", soma);
+	printf("subtracao:     %f \n", sub);
+	printf("multiplicacao: %f \n", mult);
+	printf("divisao:       %f \n", divis);
+
+  printf("\nOperacoes com inteiro\n");
+  int1 = (int) num1;
+  int2 = (int) num2;
+  somInt = int1 + int2;
+  subInt = int1 - int2;
+  multInt = int1 * int2;
+  divisInt = int1 / int2;
+
+  printf("soma:          %d \n", somInt);
+  printf("subtracao:     %d \n", subInt);
+  printf("multiplicacao: %d \n", multInt);
+  printf("divisao:       %d \n", divisInt);
+
+	return 0;
+}
+
+void errorHandler(int signal) {
+	printf("Tentativa de divisão por 0\n");
+	exit(1);
+}
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex2 ex2.c
+$ ./ex2
+-----------------------------------------------------
+RESULTADO
+
+Entre dois numeros:
+2
+0
+
+Operacoes com real
+soma:          2.000000
+subtracao:     2.000000
+multiplicacao: 0.000000
+divisao:       inf
+
+Operacoes com inteiro
+Tentativa de divisão por 0
+-----------------------------------------------------
+CONCLUSÃO
+
+Apenas a divisão por zero realizada entre inteiros ativa o sinal SIGFPE.
+Quando realizamos divisão por zero entre números reais, o compilador nos retorna inf,
+pois essa é a sua configuração default, que determinado pela IEEE 754 como descobrimos
+depois de pesquisarmos.
+-----------------------------------------------------
+
+
+
+
+QUESTÃO 3) Faça um programa para monitorar e informar o preço de chamadas telefônicas.
+O programa deverá ser executado em background.
+O início e o término de uma chamada são informados através dos sinais SIGUSR1 e SIGUSR2, respectivamente.
+O custo da ligação é de 2 centavos por segundo para ligações de até 1 minuto ou de 1 centavo por segundo
+ a partir do 2o. minuto, ou seja, uma ligação de 1m30s custa R$1,50.
+-----------------------------------------------------
+ex3.c
+
+#include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+#define TRUE 1
+
+int valor, time;
+int flag = 0;
+
+void iniciarChamada(int sinal);
+void terminarChamada(int sinal);
+
+int main () {
+	signal(SIGUSR1, iniciarChamada);
+	signal(SIGUSR2, terminarChamada);
+
+	while(TRUE) {
+		printf("Pronto para realizar ligacoes.\n");
+		pause();
+	}
+
+	return 0;
+}
+
+void iniciarChamada(int sinal) {
+	valor = 0;
+	time = 0;
+
+	printf ("Ligacao iniciada.\n");
+
+	while(TRUE) {
+		if(flag == 1){
+			flag = 0;
+			break;
+		}
+
+		sleep(1);
+		time++;
+
+		if (time <= 60)
+			valor += 2;
+		else
+			valor += 1;
+	}
+
+	return;
+}
+
+void terminarChamada(int sinal) {
+  printf ("Ligacao encerrada.\n");
+	printf("Sua ligacao durou %d segundos e custou R$%.2f\n", time, valor/100.0);
+	flag = 1;
+
+	return;
+}
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex3 ex3.c
+$ ./ex3 &
+-----------------------------------------------------
+RESULTADO
+
+[1] 34356
+Pronto para realizar ligacoes.
+
+$ kill -SIGUSR1 34356
+Ligacao iniciada.
+
+$ kill -SIGUSR2 34356
+Ligacao encerrada.
+Sua ligacao durou 11 segundos e custou R$0.22
+Pronto para realizar ligacoes.
+
+$ kill -SIGUSR1 34356
+Ligacao iniciada.
+
+$ kill -SIGUSR2 34356
+Ligacao encerrada.
+Sua ligacao durou 216 segundos e custou R$2.76
+Pronto para realizar ligacoes.
+
+-----------------------------------------------------
+CONCLUSÃO
+
+Apesar de mandarmos o programa executar em background, podemos controlar o mesmo
+a partir de sinais, mas desta vez os sinais são enviados manualmente por nós no terminal.
+-----------------------------------------------------
+
+
+
+
+QUESTÃO 4) Elabore três programas I/O bound que não terminem (loop de mensagens no vídeo).
+Elabore um programa que seja capaz de executar os 3 programas indicados anteriormente e
+que simule o compartilhamento da CPU entre os 3 processos com escalonamento Round- Robin
+com uma fatia de tempo de 1 segundo para o primeiro processo e de 2 segundos para os demais processos.
+Execute os programas e relate o que aconteceu.
+-----------------------------------------------------
+ex4.c
+
+#include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+#define TRUE 1
+
+int delay;
+
+int main () {
+	pid_t pid1,pid2,pid3,trc;
+
+	if ((pid1 = fork()) < 0){ // Processo pai
+		fprintf(stderr, "Erro ao criar Processo filho 1.\n");
+		exit(-1);
+	}
+
+	if (pid1 == 0) {
+		execv("prog1", NULL);
+	}
+	else {
+		if ((pid2 = fork()) < 0){
+			fprintf(stderr, "Erro ao criar Processo filho 2.\n");
+			exit(-1);
+		}
+
+		if (pid2 == 0) {
+			execv("prog2", NULL);
+		}
+		else {
+			if ((pid3 = fork()) < 0){
+				fprintf(stderr, "Erro ao criar Processo filho 3.\n");
+				exit(-1);
+			}
+
+			if (pid3 == 0) {
+				execv("prog3", NULL);
+			}
+			else {
+				kill(pid1, SIGSTOP);
+				kill(pid2, SIGSTOP);
+				kill(pid3, SIGSTOP);
+
+				while(TRUE) {
+					kill(pid1, SIGCONT);
+
+					sleep(1);
+					kill(pid1, SIGSTOP);
+					kill(pid2, SIGCONT);
+
+					sleep(2);
+					kill(pid2, SIGSTOP);
+					kill(pid3, SIGCONT);
+
+					sleep(2);
+					kill(pid3, SIGSTOP);
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+------------
+prog1.c
+
+#include <stdio.h>
+
+#define TRUE 1
+
+int main () {
+	while(TRUE)
+    printf("---> PROG 1\n");
+
+	return 0;
+}
+
+------------
+prog2.c
+
+#include <stdio.h>
+
+#define TRUE 1
+
+int main () {
+	while(TRUE)
+    printf("---> PROG 2\n");
+
+	return 0;
+}
+
+------------
+prog3.c
+
+#include <stdio.h>
+
+#define TRUE 1
+
+int main () {
+	while(TRUE)
+    printf("---> PROG 3\n");
+
+	return 0;
+}
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o prog1 prog1.c
+$ gcc -o prog2 prog2.c
+$ gcc -o prog3 prog3.c
+$ gcc -o ex4 ex4.c
+$ ./ex4
+-----------------------------------------------------
+RESULTADO
+
+A impressão é muito grande para por aqui.
+O resultado são impressões de "---> PROG 1" durante 1 segundo,
+seguido por impressões de "---> PROG 2" durante 2 segundos,
+seguido por impressões de "---> PROG 3" durante 2 segundos até que nós paramos
+o programa através no CTRL-C. Após o comando, o programa ainda imprime algumas
+vezes a string do processo que estava executando por último.
+-----------------------------------------------------
+CONCLUSÃO
+
+Além de outros processos, também somos capazes de controlar outros programas através de sinais.
+Desta forma, o programa ex4 consegue contralar a execução dos programas prog1, prog2 e prog3,
+demonstrando como uma CPU funciona quando diversos programas estão em execução ao mesmo tempo.
+-----------------------------------------------------
