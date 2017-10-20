@@ -1,0 +1,2 @@
+Retorno de dup():  0
+Retorno de dup2(): 1

@@ -1,0 +1,190 @@
+LUCAS FERRAÇO DE FREITAS – 1513012
+PEDRO GOMES BRANCO - 1113366
+
+QUESTÃO 1) Faça um programa para criar dois processos que se comunicam via pipe.
+O Pai lê do pipe enquanto o filho escreve no pipe.
+Exiba o resultado do que foi escrito e lido.
+-----------------------------------------------------
+ex1.c
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+int main (void) {
+  int fd[2], nEscr, nLido;
+  char msgEscr[] = "Teste de Pipe";
+  char msgLida[sizeof msgEscr];
+
+  if (pipe(fd) < 0) {
+    printf("Erro ao abrir os pipes\n");
+    exit(-1);
+  }
+
+  if (fork() != 0) { // Processo pai
+    nLido = read(fd[0], msgLida, sizeof(msgLida));
+    printf("Mensagem lida    (tam = %d): %s\n", nLido, msgLida);
+  }
+  else { // Processo filho
+    nEscr = write(fd[1], msgEscr, strlen(msgEscr) + 1);
+    printf("Mensagem escrita (tam = %d)\n", nEscr);
+  }
+
+  close(fd[0]);
+  close(fd[1]);
+
+  return 0;
+}
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex1 ex1.c
+$ ./ex1
+-----------------------------------------------------
+RESULTADO
+
+Mensagem escrita (tam = 14)
+Mensagem lida    (tam = 14): Teste de Pipe
+-----------------------------------------------------
+CONCLUSÃO
+
+Nós usamos cada lado de um pipe para fazer um tipo de operação:
+um para input e o outro para output. Dessa forma, conseguimos realizar
+uma comunicação entre dois processos, onde um escreve algo no pipe através
+de um lado, enquanto o outro lê o que está escrito no pipe pelo outro lado.
+-----------------------------------------------------
+
+
+
+
+QUESTÃO 2) Faça um programa para redirecionar a entrada e a saída,
+lendo os dados de um arquivo e gerando a saída em outro.
+-----------------------------------------------------
+ex2.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+int main (void) {
+	int fd, retorno, retorno2;
+
+	if ((fd = open("teste.txt", O_RDWR|O_CREAT|O_TRUNC, 0666)) == -1) {
+		printf("Erro open()\n");
+		return -1;
+	}
+
+	close(0);
+
+	if ((retorno = dup(fd)) == -1) {
+		printf("Erro dup()\n");
+		return -2;
+	}
+
+	if ((retorno2 = dup2(fd, 1)) == -1) {
+		printf("Erro dup2()\n");
+		return -3;
+	}
+
+	printf("Retorno de dup():  %d\n", retorno);
+	printf("Retorno de dup2(): %d\n", retorno2);
+
+	return 0;
+}
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex2 ex2.c
+$ ./ex2
+$ cat teste.txt
+-----------------------------------------------------
+RESULTADO
+
+Retorno de dup():  0
+Retorno de dup2(): 1
+-----------------------------------------------------
+CONCLUSÃO
+
+Através do uso das funções dup e dup2, podemos alterar o endereço de
+leitura e escrita de um processo. Desta maneira, redirecionamos o endereço
+de escrita do processo para o arquivo aberto (com a referência salva em fd).
+Assim, quando chamamos a função printf, ela não imprime no terminal, mas sim
+imprime no arquivo especificado (texte.txt).
+-----------------------------------------------------
+
+
+
+
+QUESTÃO 3) Faça um programa para criar um pipe e
+executar dois processos que são utilitários do Unix
+que se comuniquem através do pipe criado (a shell faz isso).
+-----------------------------------------------------
+ex3.c
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+int main (int argc, char * argv[]) {
+	int fd[2], retorno;
+
+	if(pipe(fd) < 0) {
+		printf("Erro ao abrir os pipes\n");
+		exit(-1);
+	}
+
+	if (fork() != 0) { // Processo Pai
+		if ((retorno = dup2(fd[0], 0)) == -1) {
+			printf("Erro dup2()\n");
+			return -3;
+		}
+		close(fd[1]);
+
+		argv[0] = "grep";
+		argv[1] = "e";
+    argv[2] = NULL;
+
+		execvp(argv[0], argv);
+	}
+	else { // Processo Filho
+		if ((retorno = dup2(fd[1], 1)) == -1) {
+			perror("Error dup2()");
+			return -3;
+		}
+
+		argv[0] = "ls";
+    argv[1] = NULL;
+
+		execvp(argv[0], argv);
+	}
+
+	return 0;
+}
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex3 ex3.c
+$ ./ex3
+-----------------------------------------------------
+RESULTADO
+
+ex1
+ex1.c
+ex2
+ex2.c
+ex3
+ex3.c
+teste.txt
+-----------------------------------------------------
+CONCLUSÃO
+
+Com as funções dup e dup2, alteramos o endereço de leitura e escrita do
+processo pai e de seu filho, fazendo com que o processo pai interprete
+a saída do processo filho como sua entrada. Logo, o processo pai imprime no
+terminal todos os arquivos mostrados pelo comando filho (executado pelo filho)
+como uma lista de textos.
+-----------------------------------------------------
