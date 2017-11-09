@@ -1,0 +1,53 @@
+LUCAS FERRAÇO DE FREITAS – 1513012
+PEDRO GOMES BRANCO - 1113366
+
+RELATÓRIO DO TRABALHO 1
+Escalonamento em Múltiplos Níveis com Feedback (MLF)
+-----------------------------------------------------
+PROGRAMAS A SEREM EXECUTADOS
+
+Somente o programa Interpreter precisa ser executado.
+Obs.: o programa SchedulerMLF e o Interpreter devem ser compilados
+antes da execução (como mostra a sequência de comandos abaixo).
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o SchedulerMLF SchedulerMLF.c RoundRobin.c Queue.c Process.c
+$ gcc -o Interpreter Interpreter.c
+$ gcc -o Program Program.c
+$ ./Interpreter
+-----------------------------------------------------
+ANÁLISE
+
+Fizemos diversos casos de teste para tentar cobrir todos os casos.
+Caso 1) exec Program 3
+  O programa só tem uma única rajada de 3 segundos depois é encerrado.
+  Quando o processo é iniciado ele é colocado na fila 1 e é executado por 1 segundo,
+  que é o time slice da fila 1. Após isso, ele vai para a fila 2 no qual é executado
+  pelo seu time slice de 2 segundos e o programa se encerra.
+
+Caso 2) exec Program 3,4
+  De inicio ele vai fazer o mesmo que no caso anterior, primeiro vai executar durante
+  um segundo na fila 1, correspondente ao seu time slice, e depois 2 segundos na fila 2.
+  Porém nesse caso o programa tem mais uma rajada de tempo e após a execução da primeira
+  rajada, ele era em IO durante 3 segundos depois é executado na fila 2, última fila
+  ocupada pelo processo e como precisa ser executado por 4 segundos ele é executado pela
+  fila 2 durante 2 segundos e depois mais 2 segundos pela fila 3 e depois é encerrado.
+
+Caso 3) exec Program 3,4,7
+  A diferença desse para o anterior é que depois de executar os últimos 2 segundos na
+  fila 3, ele entra em IO por mais 3 segundos e depois é executado pela fila 3, de 4
+  segundos e depois mais 3 segundos até ser então encerrado.
+
+Caso 4) exec Program 3,1
+  Seria parecido com o caso 2, porém quando voltasse do estado de IO ele não retornaria
+  para a fila 2, pois precisaria ser executado por somente 1 segundo, e a fila atual tem
+  time slice de 2 segundos e a fila 1 de 1 segundo fazendo com que ele voltasse para a fila
+  um e fosse executado lá.
+
+Caso 5) exec Program 3,1,7
+  Nesse caso depois de executar a segunda rajada de 1 segundo entraria em IO e no retorno
+  executaria 1 segundo na fila um, depois passaria para a fila 2 onde executaria mais 2
+  segundos e por fim iria para a fila 3 executar mais 4 segundos e encerrar o processo.
+
+-----------------------------------------------------
