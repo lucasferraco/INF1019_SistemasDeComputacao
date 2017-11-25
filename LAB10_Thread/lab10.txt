@@ -1,0 +1,979 @@
+LUCAS FERRAÇO DE FREITAS – 1513012
+PEDRO GOMES BRANCO - 1113366
+
+QUESTÃO 1) Execute o programa Corrida de Sapo algumas vezes e analise os
+resultados sobre a ordem de chegada dos sapos.
+Obs: compile com a opção –lpthread
+-----------------------------------------------------
+ex1.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+
+#define NUM_THREADS 5
+#define PULO_MAXIMO 100
+#define DESCANSO_MAXIMO 1
+#define DISTANCIA_PARA_CORRER 100
+
+static int classificacao = 1;
+static pthread_mutex_t lock;
+static char * resp[200];
+static int cont = 0;
+
+static void* Correr(void* sapo);
+
+int main()
+{
+	classificacao = 1;
+	pthread_t threads[NUM_THREADS];
+	int t;
+
+	printf("Corrida iniciada...\n");
+
+	for(t = 0; t < NUM_THREADS; t++)
+	{
+		pthread_create(&threads[t], NULL, Correr, (void *)t);
+	}
+
+	for(t = 0; t < NUM_THREADS; t++)
+	{
+		pthread_join(threads[t], NULL);
+	}
+
+	printf("\nAcabou!!\n");
+
+	pthread_exit(NULL);
+
+	return 0;
+}
+
+void* Correr(void* sapo)
+{
+	int pulos = 0;
+	int distanciaJaCorrida = 0;
+
+	while(distanciaJaCorrida <= DISTANCIA_PARA_CORRER)
+	{
+		int pulo = rand() % PULO_MAXIMO;
+		distanciaJaCorrida += pulo;
+		pulos++;
+		printf("Sapo %d pulou\n", (int)sapo);
+		int descanso = rand() % DESCANSO_MAXIMO;
+		sleep(descanso);
+	}
+
+	printf("Sapo %d chegou na posicao %d com %d pulos!\n", (int)sapo, classificacao, pulos);
+	cont++;
+	classificacao++;
+
+	pthread_exit(NULL);
+}
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex1 ex1.c -lpthread
+$ ./ex1
+-----------------------------------------------------
+RESULTADO
+
+Corrida iniciada...
+Sapo 0 pulou
+Sapo 0 pulou
+Sapo 0 pulou
+Sapo 0 chegou na posicao 1 com 3 pulos!
+Sapo 1 pulou
+Sapo 1 pulou
+Sapo 1 pulou
+Sapo 1 chegou na posicao 2 com 3 pulos!
+Sapo 2 pulou
+Sapo 2 pulou
+Sapo 2 chegou na posicao 3 com 2 pulos!
+Sapo 3 pulou
+Sapo 4 pulou
+Sapo 3 pulou
+Sapo 4 pulou
+Sapo 3 pulou
+Sapo 4 pulou
+Sapo 3 pulou
+Sapo 4 chegou na posicao 4 com 3 pulos!
+Sapo 3 chegou na posicao 4 com 4 pulos!
+
+Acabou!!
+
+./ex1
+Corrida iniciada...
+Sapo 0 pulou
+Sapo 1 pulou
+Sapo 2 pulou
+Sapo 0 pulou
+Sapo 1 pulou
+Sapo 2 pulou
+Sapo 3 pulou
+Sapo 4 pulou
+Sapo 0 pulou
+Sapo 1 chegou na posicao 1 com 2 pulos!
+Sapo 2 chegou na posicao 1 com 2 pulos!
+Sapo 3 pulou
+Sapo 4 pulou
+Sapo 0 chegou na posicao 1 com 3 pulos!
+Sapo 3 pulou
+Sapo 4 pulou
+Sapo 3 pulou
+Sapo 4 pulou
+Sapo 3 pulou
+Sapo 4 chegou na posicao 4 com 4 pulos!
+Sapo 3 chegou na posicao 4 com 5 pulos!
+
+Acabou!!
+
+./ex1
+Corrida iniciada...
+Sapo 0 pulou
+Sapo 1 pulou
+Sapo 0 pulou
+Sapo 1 pulou
+Sapo 2 pulou
+Sapo 3 pulou
+Sapo 4 pulou
+Sapo 0 pulou
+Sapo 1 chegou na posicao 1 com 2 pulos!
+Sapo 2 pulou
+Sapo 3 pulou
+Sapo 4 pulou
+Sapo 0 chegou na posicao 1 com 3 pulos!
+Sapo 2 pulou
+Sapo 3 pulou
+Sapo 4 pulou
+Sapo 2 pulou
+Sapo 3 pulou
+Sapo 4 chegou na posicao 3 com 3 pulos!
+Sapo 2 chegou na posicao 3 com 4 pulos!
+Sapo 3 chegou na posicao 3 com 4 pulos!
+
+Acabou!!
+-----------------------------------------------------
+CONCLUSÃO
+
+Na primeira execução, os sapos 3 e 4 chegaram na 4a. posição, mas o sapo 4
+levou 3 pulos enquanto o 3 levou 4 pulos. Nas outras execuções também ocorreram casos parecidos,
+pois não existe exclusão mútua na classificação dos sapos, assim sapos diferentes podem
+chegar na mesma posição em tempos diferentes.
+-----------------------------------------------------
+
+
+
+
+QUESTÃO 2) Usando mutex, modifique o programa Corrida de Sampo para que
+o problema identificado anteriormente não ocorra."
+-----------------------------------------------------
+ex2.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+
+#define NUM_THREADS 5
+#define PULO_MAXIMO 100
+#define DESCANSO_MAXIMO 1
+#define DISTANCIA_PARA_CORRER 100
+
+static int classificacao = 1;
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static char * resp[200];
+static int cont = 0;
+
+static void* Correr(void* sapo);
+
+int main() {
+	classificacao = 1;
+	pthread_t threads[NUM_THREADS];
+	int t;
+
+	printf("Corrida iniciada... \n");
+
+	for(t = 0; t < NUM_THREADS; t++)
+		pthread_create(&threads[t], NULL, Correr, (void *)t);
+
+	for(t = 0; t < NUM_THREADS; t++)
+		pthread_join(threads[t], NULL);
+
+	printf("\nAcabou!!\n");
+
+	pthread_exit(NULL);
+
+	return 0;
+}
+
+void* Correr(void* sapo) {
+	int pulos = 0;
+	int distanciaJaCorrida = 0;
+
+	while(distanciaJaCorrida <= DISTANCIA_PARA_CORRER) {
+		int pulo = rand() % PULO_MAXIMO;
+		distanciaJaCorrida += pulo;
+		pulos++;
+		printf("Sapo %d pulou\n", (int)sapo);
+		int descanso = rand() % DESCANSO_MAXIMO;
+		sleep(descanso);
+	}
+
+	pthread_mutex_lock(&lock);
+	printf("Sapo %d chegou na posicao %d com %d pulos!\n", (int)sapo, classificacao, pulos);
+	cont++;
+	classificacao++;
+	pthread_mutex_unlock(&lock);
+
+	pthread_exit(NULL);
+}
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex2 ex2.c -lpthread
+$ ./ex2
+-----------------------------------------------------
+RESULTADO
+
+Corrida iniciada...
+Sapo 0 pulou
+Sapo 1 pulou
+Sapo 2 pulou
+Sapo 3 pulou
+Sapo 0 pulou
+Sapo 4 pulou
+Sapo 1 pulou
+Sapo 2 pulou
+Sapo 3 pulou
+Sapo 0 pulou
+Sapo 4 pulou
+Sapo 1 pulou
+Sapo 2 chegou na posicao 1 com 2 pulos!
+Sapo 4 pulou
+Sapo 3 chegou na posicao 2 com 2 pulos!
+Sapo 0 chegou na posicao 3 com 3 pulos!
+Sapo 1 chegou na posicao 4 com 3 pulos!
+Sapo 4 chegou na posicao 5 com 3 pulos!
+
+Acabou!!
+-----------------------------------------------------
+CONCLUSÃO
+
+Como a região crítica desse problema é a atualização da classificação dos sapos,
+usamos o comando pthread_mutex_lock para garantir a exclusão mútua na atualização
+da variável de classificação.
+-----------------------------------------------------
+
+
+
+QUESTÃO 3) Usando threads, escreva um programa C que implemente o problema do produtor/consumidor.
+O produtor deve produzir dados (números inteiros pseudo-aleatórios) a cada 1 segundo
+colocando-os em uma fila (buffer, implementação circular). O consumidor deve retirar
+dados da fila a cada 2 segundos. O tamanho máximo da fila deve ser de 8 elementos (MAXFILA) e
+tanto o produtor como o consumidor devem produzir/consumir 64 elementos (números inteiros de 1 a 64, por exemplo)
+evitando condições de corrida. Variáveis compartilhadas entre threads são simplesmente variáveis globais."
+-----------------------------------------------------
+Queue.h
+
+#ifndef Queue_h
+#define Queue_h
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#define MAXFILA 8
+
+typedef struct queue Queue;
+struct queue {
+	struct node * first;
+	struct node * last;
+
+	int size;
+};
+
+Queue * q_create (void);
+
+void q_enqueue (int item, Queue * queue);
+
+int q_dequeue (Queue * queue);
+
+int q_isFull(Queue * queue);
+
+int q_isEmpty (Queue * queue);
+
+void q_free (Queue * queue);
+
+#endif /* Queue_h */
+-----------------------------------------------------
+#include "Queue.h"
+
+typedef struct node Node;
+struct node {
+	int value;
+	Node * next;
+};
+
+Queue * q_create() {
+	Queue * q = (Queue *) malloc(sizeof(Queue));
+
+	q->first = NULL;
+	q->last = NULL;
+	q->size = 0;
+
+	return q;
+}
+
+void q_enqueue(int item, Queue * queue) {
+	Node * newNode = (Node *) malloc(sizeof(Node));
+
+	newNode->value = item;
+	newNode->next = NULL;
+
+	if (queue->first == NULL) {
+		queue->first = newNode;
+	}
+	else {
+		queue->last->next = newNode;
+	}
+	queue->last = newNode;
+
+	(queue->size)++;
+}
+
+int q_dequeue(Queue * queue) {
+	Node * removingNode = queue->first;
+	void * value;
+
+	if (removingNode == NULL) {
+		return NULL;
+	}
+
+	value = removingNode->value;
+
+	queue->first = removingNode->next;
+	(queue->size)--;
+	free(removingNode);
+
+	return value;
+}
+
+int q_isFull(Queue * queue) {
+	return queue->size == MAXFILA;
+}
+
+int q_isEmpty(Queue * queue) {
+	return queue->first == NULL;
+}
+
+void q_free(Queue * queue) {
+	while (queue->first != NULL) {
+		q_dequeue(queue);
+	}
+
+	free(queue);
+}
+-----------------------------------------------------
+ex3.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+#include "Queue.h"
+
+#define NUMTHREADS 2
+#define MAXELEMENTOS 64
+
+Queue * q;
+int notBusy = 1;
+
+void * produtor(void * threadId);
+void * consumidor(void * threadId);
+
+int main(int argc, char const *argv[]) {
+	int i;
+	pthread_t threads[NUMTHREADS];
+
+	q = q_create();
+	pthread_create(&threads[0], NULL, produtor, (void *)0);
+	pthread_create(&threads[1], NULL, consumidor, (void *)1);
+
+	for (i = 0; i < 2; i++)
+		pthread_join(threads[i], NULL);
+
+	q_free(q);
+
+	return 0;
+}
+
+void * produtor(void * threadId) {
+	int i, r;
+
+	for (i = 0; i < MAXELEMENTOS;) {
+		sleep(1);
+
+		if(!q_isFull(q) && notBusy) {
+			notBusy = 0;
+
+			r = rand()%40;
+			q_enqueue(r, q);
+
+			printf("P  -  adicionou %do. numero (%d)\n", i, r);
+
+			notBusy = 1;
+			i++;
+		}
+		else {
+			printf("P  -  Fila cheia/ocupada\n");
+		}
+	}
+
+	pthread_exit(NULL);
+}
+
+void * consumidor(void * threadId) {
+	int i, r;
+
+	for (i = 0; i < MAXELEMENTOS;) {
+		sleep(2);
+
+		if(!q_isEmpty(q) && notBusy) {
+			notBusy = 0;
+
+			r = q_dequeue(q);
+
+			printf("C  -  consumiu %do. numero (%d)\n", i, r);
+
+			notBusy = 1;
+			i++;
+		}
+		else {
+			printf("C  -  Fila vazia/ocupada\n");
+		}
+	}
+
+	pthread_exit(NULL);
+}
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex3 ex3.c Queue.c
+$ ./ex3
+-----------------------------------------------------
+RESULTADO
+
+P  -  adicionou 0o. numero (7)
+C  -  consumiu 0o. numero (7)
+P  -  adicionou 1o. numero (9)
+P  -  adicionou 2o. numero (33)
+C  -  consumiu 1o. numero (9)
+P  -  adicionou 3o. numero (18)
+P  -  adicionou 4o. numero (10)
+C  -  consumiu 2o. numero (33)
+P  -  adicionou 5o. numero (32)
+P  -  adicionou 6o. numero (24)
+C  -  consumiu 3o. numero (18)
+P  -  adicionou 7o. numero (38)
+P  -  adicionou 8o. numero (3)
+C  -  consumiu 4o. numero (10)
+P  -  adicionou 9o. numero (29)
+P  -  adicionou 10o. numero (0)
+C  -  consumiu 5o. numero (32)
+P  -  adicionou 11o. numero (5)
+P  -  adicionou 12o. numero (12)
+C  -  consumiu 6o. numero (24)
+P  -  adicionou 13o. numero (2)
+P  -  adicionou 14o. numero (27)
+C  -  consumiu 7o. numero (38)
+P  -  adicionou 15o. numero (23)
+P  -  Fila cheia/ocupada
+C  -  consumiu 8o. numero (3)
+P  -  adicionou 16o. numero (7)
+P  -  Fila cheia/ocupada
+C  -  consumiu 9o. numero (29)
+P  -  adicionou 17o. numero (9)
+P  -  Fila cheia/ocupada
+C  -  consumiu 10o. numero (0)
+P  -  adicionou 18o. numero (0)
+P  -  Fila cheia/ocupada
+C  -  consumiu 11o. numero (5)
+P  -  adicionou 19o. numero (12)
+P  -  Fila cheia/ocupada
+C  -  consumiu 12o. numero (12)
+P  -  adicionou 20o. numero (23)
+P  -  Fila cheia/ocupada
+C  -  consumiu 13o. numero (2)
+P  -  adicionou 21o. numero (9)
+P  -  Fila cheia/ocupada
+C  -  consumiu 14o. numero (27)
+P  -  adicionou 22o. numero (29)
+P  -  Fila cheia/ocupada
+C  -  consumiu 15o. numero (23)
+P  -  adicionou 23o. numero (37)
+P  -  Fila cheia/ocupada
+C  -  consumiu 16o. numero (7)
+P  -  adicionou 24o. numero (0)
+P  -  Fila cheia/ocupada
+C  -  consumiu 17o. numero (9)
+P  -  adicionou 25o. numero (13)
+P  -  Fila cheia/ocupada
+C  -  consumiu 18o. numero (0)
+P  -  adicionou 26o. numero (19)
+P  -  Fila cheia/ocupada
+C  -  consumiu 19o. numero (12)
+P  -  adicionou 27o. numero (38)
+P  -  Fila cheia/ocupada
+C  -  consumiu 20o. numero (23)
+P  -  adicionou 28o. numero (16)
+P  -  Fila cheia/ocupada
+C  -  consumiu 21o. numero (9)
+P  -  adicionou 29o. numero (15)
+P  -  Fila cheia/ocupada
+C  -  consumiu 22o. numero (29)
+P  -  adicionou 30o. numero (17)
+P  -  Fila cheia/ocupada
+C  -  consumiu 23o. numero (37)
+P  -  adicionou 31o. numero (26)
+P  -  Fila cheia/ocupada
+C  -  consumiu 24o. numero (0)
+P  -  adicionou 32o. numero (32)
+P  -  Fila cheia/ocupada
+C  -  consumiu 25o. numero (13)
+P  -  adicionou 33o. numero (27)
+P  -  Fila cheia/ocupada
+C  -  consumiu 26o. numero (19)
+P  -  adicionou 34o. numero (10)
+P  -  Fila cheia/ocupada
+C  -  consumiu 27o. numero (38)
+P  -  adicionou 35o. numero (33)
+P  -  Fila cheia/ocupada
+C  -  consumiu 28o. numero (16)
+P  -  adicionou 36o. numero (19)
+P  -  Fila cheia/ocupada
+C  -  consumiu 29o. numero (15)
+P  -  adicionou 37o. numero (29)
+P  -  Fila cheia/ocupada
+C  -  consumiu 30o. numero (17)
+P  -  adicionou 38o. numero (19)
+P  -  Fila cheia/ocupada
+C  -  consumiu 31o. numero (26)
+P  -  adicionou 39o. numero (21)
+P  -  Fila cheia/ocupada
+C  -  consumiu 32o. numero (32)
+P  -  adicionou 40o. numero (7)
+P  -  Fila cheia/ocupada
+C  -  consumiu 33o. numero (27)
+P  -  adicionou 41o. numero (32)
+P  -  Fila cheia/ocupada
+C  -  consumiu 34o. numero (10)
+P  -  adicionou 42o. numero (33)
+P  -  Fila cheia/ocupada
+C  -  consumiu 35o. numero (33)
+P  -  adicionou 43o. numero (16)
+P  -  Fila cheia/ocupada
+C  -  consumiu 36o. numero (19)
+P  -  adicionou 44o. numero (5)
+P  -  Fila cheia/ocupada
+C  -  consumiu 37o. numero (29)
+P  -  adicionou 45o. numero (25)
+P  -  Fila cheia/ocupada
+C  -  consumiu 38o. numero (19)
+P  -  adicionou 46o. numero (28)
+P  -  Fila cheia/ocupada
+C  -  consumiu 39o. numero (21)
+P  -  adicionou 47o. numero (11)
+P  -  Fila cheia/ocupada
+C  -  consumiu 40o. numero (7)
+P  -  adicionou 48o. numero (34)
+P  -  Fila cheia/ocupada
+C  -  consumiu 41o. numero (32)
+P  -  adicionou 49o. numero (37)
+P  -  Fila cheia/ocupada
+C  -  consumiu 42o. numero (33)
+P  -  adicionou 50o. numero (1)
+P  -  Fila cheia/ocupada
+C  -  consumiu 43o. numero (16)
+P  -  adicionou 51o. numero (33)
+P  -  Fila cheia/ocupada
+C  -  consumiu 44o. numero (5)
+P  -  adicionou 52o. numero (28)
+P  -  Fila cheia/ocupada
+C  -  consumiu 45o. numero (25)
+P  -  adicionou 53o. numero (24)
+P  -  Fila cheia/ocupada
+C  -  consumiu 46o. numero (28)
+P  -  adicionou 54o. numero (28)
+P  -  Fila cheia/ocupada
+C  -  consumiu 47o. numero (11)
+P  -  adicionou 55o. numero (10)
+P  -  Fila cheia/ocupada
+C  -  consumiu 48o. numero (34)
+P  -  adicionou 56o. numero (4)
+P  -  Fila cheia/ocupada
+C  -  consumiu 49o. numero (37)
+P  -  adicionou 57o. numero (36)
+P  -  Fila cheia/ocupada
+C  -  consumiu 50o. numero (1)
+P  -  adicionou 58o. numero (10)
+P  -  Fila cheia/ocupada
+C  -  consumiu 51o. numero (33)
+P  -  adicionou 59o. numero (23)
+P  -  Fila cheia/ocupada
+C  -  consumiu 52o. numero (28)
+P  -  adicionou 60o. numero (2)
+P  -  Fila cheia/ocupada
+C  -  consumiu 53o. numero (24)
+P  -  adicionou 61o. numero (26)
+P  -  Fila cheia/ocupada
+C  -  consumiu 54o. numero (28)
+P  -  adicionou 62o. numero (29)
+P  -  Fila cheia/ocupada
+C  -  consumiu 55o. numero (10)
+P  -  adicionou 63o. numero (24)
+C  -  consumiu 56o. numero (4)
+C  -  consumiu 57o. numero (36)
+C  -  consumiu 58o. numero (10)
+C  -  consumiu 59o. numero (23)
+C  -  consumiu 60o. numero (2)
+C  -  consumiu 61o. numero (26)
+C  -  consumiu 62o. numero (29)
+C  -  consumiu 63o. numero (24)
+-----------------------------------------------------
+CONCLUSÃO
+
+O programa executa perfeitamente, apesar de não ser a solução ideal, pois usamos
+chamadas de sleep para evitar as condições de corrida, quando deveríamos usar
+o mutex na região crítica para garantir exclusão mútua.
+-----------------------------------------------------
+
+
+
+
+QUESTÃO 4) Modifique o programa anterior, para que haja 2 (ou mais) threads
+consumidor e 2 (ou mais) threads produtor. O que muda em relação
+ao uso do mutex e da variável de condição?
+
+-----------------------------------------------------
+Queue.h
+
+#ifndef Queue_h
+#define Queue_h
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#define MAXFILA 8
+
+typedef struct queue Queue;
+struct queue {
+	struct node * first;
+	struct node * last;
+
+	int size;
+};
+
+Queue * q_create (void);
+
+void q_enqueue (int item, Queue * queue);
+
+int q_dequeue (Queue * queue);
+
+int q_isFull(Queue * queue);
+
+int q_isEmpty (Queue * queue);
+
+void q_free (Queue * queue);
+
+#endif /* Queue_h */
+-----------------------------------------------------
+Queue.c
+
+#include "Queue.h"
+
+typedef struct node Node;
+struct node {
+	int value;
+	Node * next;
+};
+
+Queue * q_create() {
+	Queue * q = (Queue *) malloc(sizeof(Queue));
+
+	q->first = NULL;
+	q->last = NULL;
+	q->size = 0;
+
+	return q;
+}
+
+void q_enqueue(int item, Queue * queue) {
+	Node * newNode = (Node *) malloc(sizeof(Node));
+
+	newNode->value = item;
+	newNode->next = NULL;
+
+	if (queue->first == NULL) {
+		queue->first = newNode;
+	}
+	else {
+		queue->last->next = newNode;
+	}
+	queue->last = newNode;
+
+	(queue->size)++;
+}
+
+int q_dequeue(Queue * queue) {
+	Node * removingNode = queue->first;
+	void * value;
+
+	if (removingNode == NULL) {
+		return NULL;
+	}
+
+	value = removingNode->value;
+
+	queue->first = removingNode->next;
+	(queue->size)--;
+	free(removingNode);
+
+	return value;
+}
+
+int q_isFull(Queue * queue) {
+	return queue->size == MAXFILA;
+}
+
+int q_isEmpty(Queue * queue) {
+	return queue->first == NULL;
+}
+
+void q_free(Queue * queue) {
+	while (queue->first != NULL) {
+		q_dequeue(queue);
+	}
+
+	free(queue);
+}
+-----------------------------------------------------
+ex4.c
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+#include "Queue.h"
+
+#define NUMTHREADS 4
+#define MAXELEMENTOS 20
+
+Queue* q;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t production_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t consume_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t product = PTHREAD_COND_INITIALIZER;
+pthread_cond_t consume = PTHREAD_COND_INITIALIZER;
+
+void * produtor(void * threadId);
+void * consumidor(void * threadId);
+
+int main(int argc, char const *argv[]) {
+  int i;
+	pthread_t threads[NUMTHREADS];
+
+  q = q_create();
+
+	pthread_create(&threads[0], NULL, produtor, (void *)0);
+	pthread_create(&threads[1], NULL, produtor, (void *)1);
+	pthread_create(&threads[2], NULL, consumidor, (void *)2);
+	pthread_create(&threads[3], NULL, consumidor, (void *)3);
+
+	for (int i = 0; i < NUMTHREADS; i++)
+		pthread_join(threads[i], NULL);
+
+	return 0;
+}
+
+void * produtor(void * threadId) {
+  int i, r;
+
+	for (int i = 0; i < MAXELEMENTOS;) {
+		sleep(1);
+
+		if(!q_isFull(q)) {
+			pthread_mutex_lock(&mutex);
+
+			r = rand()%40;
+			q_enqueue(r, q);
+
+      printf("P  -  adicionou %do. numero (%d) - thread %d\n", i + 1, r, (int)threadId);
+
+			pthread_mutex_unlock(&mutex);
+			pthread_cond_signal(&consume);
+			i++;
+		}
+		else {
+      printf("P  -  Fila cheia - para thread %d\n", (int)threadId);
+
+			pthread_mutex_lock(&production_mutex);
+			pthread_cond_wait(&product, &production_mutex);
+			pthread_mutex_unlock(&production_mutex);
+
+      printf("P  -  Desbloqueado produtor de thread %d\n", (int)threadId);
+		}
+	}
+
+	pthread_exit(NULL);
+}
+
+void * consumidor(void * threadId) {
+	for (int i = 0; i < MAXELEMENTOS;) {
+		sleep(2);
+
+		if(!q_isEmpty(q)) {
+			pthread_mutex_lock(&mutex);
+
+			int r = q_dequeue(q);
+
+      printf("C  -  consumiu %do. numero (%d) - thread %d\n", i + 1, r, (int)threadId);
+
+			pthread_mutex_unlock(&mutex);
+			pthread_cond_signal(&product);
+			i++;
+		}
+		else {
+      printf("C  -  Fila vazia, para thread %d!\n", (int)threadId);
+
+			pthread_mutex_lock(&consume_mutex);
+			pthread_cond_wait(&consume, &consume_mutex);
+			pthread_mutex_unlock(&consume_mutex);
+
+      printf("C  -  Desbloqueado consumidor de thread %d\n", (int)threadId);
+		}
+	}
+
+	pthread_exit(NULL);
+}
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o ex4 ex4.c Queue.c
+$ ./ex4
+-----------------------------------------------------
+RESULTADO
+
+P  -  adicionou 1o. numero (7) - thread 0
+P  -  adicionou 1o. numero (9) - thread 1
+C  -  consumiu 1o. numero (7) - thread 2
+C  -  consumiu 1o. numero (9) - thread 3
+P  -  adicionou 2o. numero (33) - thread 0
+P  -  adicionou 2o. numero (18) - thread 1
+P  -  adicionou 3o. numero (10) - thread 0
+P  -  adicionou 3o. numero (32) - thread 1
+C  -  consumiu 2o. numero (33) - thread 2
+C  -  consumiu 2o. numero (18) - thread 3
+P  -  adicionou 4o. numero (24) - thread 0
+P  -  adicionou 4o. numero (38) - thread 1
+P  -  adicionou 5o. numero (3) - thread 1
+P  -  adicionou 5o. numero (29) - thread 0
+C  -  consumiu 3o. numero (10) - thread 2
+C  -  consumiu 3o. numero (32) - thread 3
+P  -  adicionou 6o. numero (0) - thread 1
+P  -  adicionou 6o. numero (5) - thread 0
+P  -  adicionou 7o. numero (12) - thread 1
+P  -  adicionou 7o. numero (2) - thread 0
+C  -  consumiu 4o. numero (24) - thread 2
+C  -  consumiu 4o. numero (38) - thread 3
+P  -  adicionou 8o. numero (27) - thread 1
+P  -  adicionou 8o. numero (23) - thread 0
+P  -  Fila cheia - para thread 1
+P  -  Fila cheia - para thread 0
+C  -  consumiu 5o. numero (3) - thread 2
+C  -  consumiu 5o. numero (29) - thread 3
+P  -  Desbloqueado produtor de thread 1
+P  -  Desbloqueado produtor de thread 0
+P  -  adicionou 9o. numero (7) - thread 1
+P  -  adicionou 9o. numero (9) - thread 0
+C  -  consumiu 6o. numero (0) - thread 2
+P  -  adicionou 10o. numero (0) - thread 1
+C  -  consumiu 6o. numero (5) - thread 3
+P  -  adicionou 10o. numero (12) - thread 0
+P  -  Fila cheia - para thread 1
+P  -  Fila cheia - para thread 0
+C  -  consumiu 7o. numero (12) - thread 2
+C  -  consumiu 7o. numero (2) - thread 3
+P  -  Desbloqueado produtor de thread 1
+P  -  Desbloqueado produtor de thread 0
+P  -  adicionou 11o. numero (23) - thread 1
+P  -  adicionou 11o. numero (9) - thread 0
+C  -  consumiu 8o. numero (27) - thread 2
+C  -  consumiu 8o. numero (23) - thread 3
+P  -  adicionou 12o. numero (29) - thread 1
+P  -  adicionou 12o. numero (37) - thread 0
+P  -  Fila cheia - para thread 1
+P  -  Fila cheia - para thread 0
+C  -  consumiu 9o. numero (7) - thread 2
+P  -  Desbloqueado produtor de thread 1
+C  -  consumiu 9o. numero (9) - thread 3
+P  -  Desbloqueado produtor de thread 0
+P  -  adicionou 13o. numero (0) - thread 1
+P  -  adicionou 13o. numero (13) - thread 0
+C  -  consumiu 10o. numero (0) - thread 3
+C  -  consumiu 10o. numero (12) - thread 2
+P  -  adicionou 14o. numero (19) - thread 1
+P  -  adicionou 14o. numero (38) - thread 0
+P  -  Fila cheia - para thread 0
+P  -  Fila cheia - para thread 1
+C  -  consumiu 11o. numero (23) - thread 3
+C  -  consumiu 11o. numero (9) - thread 2
+P  -  Desbloqueado produtor de thread 0
+P  -  Desbloqueado produtor de thread 1
+P  -  adicionou 15o. numero (16) - thread 0
+P  -  adicionou 15o. numero (15) - thread 1
+C  -  consumiu 12o. numero (29) - thread 3
+C  -  consumiu 12o. numero (37) - thread 2
+P  -  adicionou 16o. numero (17) - thread 0
+P  -  adicionou 16o. numero (26) - thread 1
+P  -  Fila cheia - para thread 0
+P  -  Fila cheia - para thread 1
+C  -  consumiu 13o. numero (0) - thread 3
+C  -  consumiu 13o. numero (13) - thread 2
+P  -  Desbloqueado produtor de thread 0
+P  -  Desbloqueado produtor de thread 1
+P  -  adicionou 17o. numero (32) - thread 0
+P  -  adicionou 17o. numero (27) - thread 1
+P  -  Fila cheia - para thread 1
+P  -  Fila cheia - para thread 0
+C  -  consumiu 14o. numero (19) - thread 2
+C  -  consumiu 14o. numero (38) - thread 3
+P  -  Desbloqueado produtor de thread 1
+P  -  Desbloqueado produtor de thread 0
+P  -  adicionou 18o. numero (10) - thread 1
+P  -  adicionou 18o. numero (33) - thread 0
+C  -  consumiu 15o. numero (16) - thread 3
+C  -  consumiu 15o. numero (15) - thread 2
+P  -  adicionou 19o. numero (19) - thread 0
+P  -  adicionou 19o. numero (29) - thread 1
+P  -  Fila cheia - para thread 0
+P  -  Fila cheia - para thread 1
+C  -  consumiu 16o. numero (17) - thread 3
+P  -  Desbloqueado produtor de thread 0
+C  -  consumiu 16o. numero (26) - thread 2
+P  -  Desbloqueado produtor de thread 1
+P  -  adicionou 20o. numero (19) - thread 1
+P  -  adicionou 20o. numero (21) - thread 0
+C  -  consumiu 17o. numero (32) - thread 3
+C  -  consumiu 17o. numero (27) - thread 2
+C  -  consumiu 18o. numero (10) - thread 3
+C  -  consumiu 18o. numero (33) - thread 2
+C  -  consumiu 19o. numero (19) - thread 3
+C  -  consumiu 19o. numero (29) - thread 2
+C  -  consumiu 20o. numero (19) - thread 2
+C  -  consumiu 20o. numero (21) - thread 3
+-----------------------------------------------------
+CONCLUSÃO
+
+Para poder adequar o problema para 2 consumidores e 2 produtores, foi necessário
+usar variáveis de controle e adequar nossa solução da questão 3 com mutex.
+-----------------------------------------------------
